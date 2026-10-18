@@ -50,6 +50,7 @@ def init_state():
         "fired_notifications": set(),
         "workflow_running": False,
         "workflow_messages": [],
+        "welcome_shown": False,  # Tracks state for startup welcome popup
     }
 
     for key, value in defaults.items():
@@ -173,6 +174,34 @@ def generate_pdf_bytes(chat_title, chat_history):
     doc.build(story)
     buffer.seek(0)
     return buffer
+
+
+# ============================================================
+# STARTUP WELCOME POPUP DIALOG
+# ============================================================
+
+@st.dialog("👋 Welcome to OMNI AI!")
+def show_welcome_popup():
+    st.image(
+        "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
+        caption="OMNI AI Autonomous Core",
+        use_container_width=True
+    )
+    st.markdown("### 🤖 Welcome to OMNI AI Multi-Agent System")
+    st.write(
+        "Your centralized intelligence platform featuring 10 specialized sub-agents, "
+        "real-time notifications, interactive domain-specific chatbots, and comprehensive document exports."
+    )
+    st.info("✨ **OMNI AI** was brilliantly **Designed and Developed by Team AI Markhors**.")
+    
+    if st.button("🚀 Get Started", use_container_width=True):
+        st.session_state.welcome_shown = True
+        st.rerun()
+
+
+# Trigger startup popup if not shown yet
+if not st.session_state.welcome_shown:
+    show_welcome_popup()
 
 
 # ============================================================
