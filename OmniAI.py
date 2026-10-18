@@ -106,6 +106,7 @@ def generate_docx_bytes(chat_title, chat_history):
     doc = Document()
     doc.add_heading(f"OMNI AI Chat Report: {chat_title}", 0)
     doc.add_paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    doc.add_paragraph(f"Designed & Developed by: Team AI Markhors")
     doc.add_paragraph("-" * 40)
 
     for msg in chat_history:
@@ -131,14 +132,14 @@ def generate_pdf_bytes(chat_title, chat_history):
         'ReportTitle',
         parent=styles['Heading1'],
         fontSize=18,
-        spaceAfter=12
+        spaceAfter=6
     )
     
     meta_style = ParagraphStyle(
         'ReportMeta',
         parent=styles['Normal'],
         fontSize=10,
-        textColor=colors_HexColor("#666666") if 'colors_HexColor' in globals() else styles['Normal'].textColor,
+        textColor=styles['Normal'].textColor,
         spaceAfter=18
     )
 
@@ -158,14 +159,13 @@ def generate_pdf_bytes(chat_title, chat_history):
     )
 
     story.append(Paragraph(f"OMNI AI Chat Report: {chat_title}", title_style))
-    story.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", meta_style))
+    story.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | <b>Designed & Developed by Team AI Markhors</b>", meta_style))
     story.append(Spacer(1, 10))
 
     for msg in chat_history:
         role_label = "<b>User</b>" if msg["role"] == "user" else "<b>OMNI AI Agent</b>"
         story.append(Paragraph(role_label, role_style))
         
-        # Clean plain text for reportlab paragraph safely
         content_text = str(msg["content"]).replace("\n", "<br/>")
         story.append(Paragraph(content_text, body_style))
         story.append(Spacer(1, 6))
@@ -186,11 +186,13 @@ def show_orchestrator_popup():
         caption="OMNI AI Core - Orchestrator Visual",
         use_container_width=True
     )
-    st.write("### Master Intelligence Node Active")
+    st.write("### 🤖 Master Intelligence Node Active")
     st.markdown(
         "The **AI Orchestrator** is actively managing all 10 specialist sub-agents, "
         "handling asynchronous routing, event loop scheduling, and multi-agent communications."
     )
+    
+    st.info("✨ **OMNI AI** was brilliantly **Designed and Developed by Team AI Markhors**.")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -200,7 +202,7 @@ def show_orchestrator_popup():
         st.metric("Security Gateway", "Secured")
         st.metric("API Fallback Status", "Active")
 
-    if st.button("Close Portal", use_container_width=True):
+    if st.button("💬 Close & Return", use_container_width=True):
         st.rerun()
 
 
@@ -1703,8 +1705,8 @@ st.divider()
 st.caption(
     "🤖 OMNI AI | "
     "Omni-Agentic Intelligent Automation System | "
+    "Designed & Developed by Team AI Markhors | "
     "10 AI Agents | "
     "Demo + Grok + OpenAI API Modes | "
-    "Streamlit + Python | "
-    "No Database Dependency"
+    "Streamlit + Python"
 )
