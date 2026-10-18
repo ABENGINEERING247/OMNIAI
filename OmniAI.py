@@ -1,8 +1,15 @@
 import os
 from datetime import date, time, datetime
+from io import BytesIO
 
 import requests
 import streamlit as st
+
+# Document Generation Libraries
+from docx import Document
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 try:
     from streamlit_autorefresh import st_autorefresh
@@ -89,6 +96,83 @@ def delete_item(collection_name, index):
         st.session_state[collection_name] = items
 
     st.rerun()
+
+
+# ============================================================
+# DOCUMENT EXPORT GENERATORS (PDF & DOCX)
+# ============================================================
+
+def generate_docx_bytes(chat_title, chat_history):
+    doc = Document()
+    doc.add_heading(f"OMNI AI Chat Report: {chat_title}", 0)
+    doc.add_paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    doc.add_paragraph("-" * 40)
+
+    for msg in chat_history:
+        role_label = "User" if msg["role"] == "user" else "OMNI AI Agent"
+        doc.add_heading(role_label, level=2)
+        doc.add_paragraph(msg["content"])
+        doc.add_paragraph("")
+
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def generate_pdf_bytes(chat_title, chat_history):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
+    
+    story = []
+    
+    title_style = ParagraphStyle(
+        'ReportTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceAfter=12
+    )
+    
+    meta_style = ParagraphStyle(
+        'ReportMeta',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors_HexColor("#666666") if 'colors_HexColor' in globals() else styles['Normal'].textColor,
+        spaceAfter=18
+    )
+
+    role_style = ParagraphStyle(
+        'RoleHeading',
+        parent=styles['Heading2'],
+        fontSize=12,
+        spaceBefore=10,
+        spaceAfter=4
+    )
+
+    body_style = ParagraphStyle(
+        'BodyTextCustom',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=10
+    )
+
+    story.append(Paragraph(f"OMNI AI Chat Report: {chat_title}", title_style))
+    story.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", meta_style))
+    story.append(Spacer(1, 10))
+
+    for msg in chat_history:
+        role_label = "<b>User</b>" if msg["role"] == "user" else "<b>OMNI AI Agent</b>"
+        story.append(Paragraph(role_label, role_style))
+        
+        # Clean plain text for reportlab paragraph safely
+        content_text = str(msg["content"]).replace("\n", "<br/>")
+        story.append(Paragraph(content_text, body_style))
+        story.append(Spacer(1, 6))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 
 # ============================================================
@@ -186,11 +270,11 @@ AGENTS = {
 
 
 # ============================================================
-# DEDICATED AGENT CHAT COMPONENT
+# DEDICATED AGENT CHAT COMPONENT (WITH PDF & DOCX EXPORTS)
 # ============================================================
 
 def render_dedicated_chatbot(module_key, agent_name, agent_description):
-    """Renders an interactive chat interface scoped strictly to a dedicated agent."""
+    """Renders an interactive chat interface scoped strictly to a dedicated agent with Export options."""
     with st.expander(f"💬 Talk to {agent_name} (Dedicated Assistant)", expanded=False):
         st.caption(f"**Agent Objective:** {agent_description}")
         
@@ -209,7 +293,6 @@ def render_dedicated_chatbot(module_key, agent_name, agent_description):
         if user_input:
             chat_history.append({"role": "user", "content": user_input})
             
-            # Restrict context strictly to the dedicated agent
             scoped_prompt = (
                 f"[STRICT CONSTRAINT: You are ONLY the {agent_name}. "
                 f"Do not switch roles or act as another agent. Description: {agent_description}] "
@@ -238,10 +321,36 @@ def render_dedicated_chatbot(module_key, agent_name, agent_description):
                     
             chat_history.append({"role": "assistant", "content": response_text})
             st.rerun()
+
+        # Export and Clear Controls
+        if chat_history:
+            st.divider()
+            col_exp1, col_exp2, col_exp3 = st.columns(3)
             
-        if st.button(f"Clear {agent_name} Chat", key=f"clear_{module_key}"):
-            st.session_state.module_chats[module_key] = []
-            st.rerun()
+            with col_exp1:
+                docx_buffer = generate_docx_bytes(agent_name, chat_history)
+                st.download_button(
+                    label="📥 Download DOCX",
+                    data=docx_buffer,
+                    file_name=f"{module_key}_chat_report.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key=f"download_docx_{module_key}"
+                )
+                
+            with col_exp2:
+                pdf_buffer = generate_pdf_bytes(agent_name, chat_history)
+                st.download_button(
+                    label="📥 Download PDF",
+                    data=pdf_buffer,
+                    file_name=f"{module_key}_chat_report.pdf",
+                    mime="application/pdf",
+                    key=f"download_pdf_{module_key}"
+                )
+                
+            with col_exp3:
+                if st.button(f"Clear Chat", key=f"clear_{module_key}", use_container_width=True):
+                    st.session_state.module_chats[module_key] = []
+                    st.rerun()
 
 
 # ============================================================
@@ -984,9 +1093,30 @@ elif page == "💬 OMNI AI Chatbot":
 
         st.session_state.chat_history.append({"role": "assistant", "content": answer})
 
-    if st.button("🗑️ Clear Chat", use_container_width=True):
-        st.session_state.chat_history = []
-        st.rerun()
+    # Export & Clear Controls for Main Chatbot
+    if st.session_state.chat_history:
+        st.divider()
+        col_m1, col_m2, col_m3 = st.columns(3)
+        with col_m1:
+            docx_buffer = generate_docx_bytes("OMNI Main Chatbot", st.session_state.chat_history)
+            st.download_button(
+                label="📥 Download DOCX",
+                data=docx_buffer,
+                file_name="omni_main_chatbot_report.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+        with col_m2:
+            pdf_buffer = generate_pdf_bytes("OMNI Main Chatbot", st.session_state.chat_history)
+            st.download_button(
+                label="📥 Download PDF",
+                data=pdf_buffer,
+                file_name="omni_main_chatbot_report.pdf",
+                mime="application/pdf"
+            )
+        with col_m3:
+            if st.button("🗑️ Clear Chat", use_container_width=True):
+                st.session_state.chat_history = []
+                st.rerun()
 
 
 # ============================================================
